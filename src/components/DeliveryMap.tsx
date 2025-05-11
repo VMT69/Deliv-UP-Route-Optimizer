@@ -98,14 +98,14 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
   return (
     <div className="h-[400px] rounded-lg overflow-hidden shadow-md">
       <MapContainer 
+        center={bangaloreCoords}
         zoom={12} 
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%' }}
-        center={bangaloreCoords}
       >
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
         <ChangeMapView coords={mapCenter} />

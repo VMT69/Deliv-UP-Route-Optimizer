@@ -23,7 +23,7 @@ const CustomerList = ({ customers, onDeliveryComplete, onDeleteDelivery }: Custo
           {customers.map((customer, index) => (
             <div 
               key={customer.id}
-              className={`customer-card ${customer.status}`}
+              className="p-4 bg-background rounded-lg border shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="flex justify-between items-start">
                 <div>
@@ -34,13 +34,13 @@ const CustomerList = ({ customers, onDeliveryComplete, onDeleteDelivery }: Custo
                     <h3 className="font-semibold text-lg">{customer.name}</h3>
                     
                     {customer.status === 'completed' && (
-                      <span className="delivery-status-badge bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <Check className="mr-1 h-3 w-3" />
                         Delivered
                       </span>
                     )}
                     {customer.status === 'current' && (
-                      <span className="delivery-status-badge bg-blue-100 text-blue-800">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         Current
                       </span>
                     )}

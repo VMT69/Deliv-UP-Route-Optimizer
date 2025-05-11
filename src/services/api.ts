@@ -1,12 +1,9 @@
-
 import axios from 'axios';
 import { Customer } from '@/types/customer';
 
-// Mock API service for route optimization
-// In a real application, this would call your Express backend
+// Enhanced route optimization using Nearest Neighbor algorithm
+// prioritizing efficient routing rather than sequence order
 export const optimizeRoute = async (customers: Customer[], currentLocation?: { lat: number, lng: number }): Promise<Customer[]> => {
-  // For this demo, we'll implement a simple nearest neighbor algorithm directly in the frontend
-  // In production, this would be a call to your backend API
   console.log('Optimizing route for customers:', customers);
   
   // If no customers, return empty array
@@ -40,44 +37,74 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
   }
   
   // Clone the customers array to avoid mutating the original
-  // Preserve the status of existing customers
-  const remaining = customers.map(customer => ({...customer}));
+  const customersClone = customers.map(customer => ({...customer}));
+  
+  // Separate customers by status
+  const completedCustomers = customersClone.filter(c => c.status === 'completed');
+  const currentCustomer = customersClone.find(c => c.status === 'current');
+  const pendingCustomers = customersClone.filter(c => c.status === 'pending');
+  
+  // The final optimized route
   const optimizedRoute: Customer[] = [];
+  
+  // First, add all completed customers (keep their original order)
+  optimizedRoute.push(...completedCustomers);
+  
+  // For path optimization we'll only work with current and pending customers
+  const remainingCustomers = currentCustomer 
+    ? [currentCustomer, ...pendingCustomers] 
+    : [...pendingCustomers];
+  
+  // If we have no remaining customers, return just the completed ones
+  if (remainingCustomers.length === 0) {
+    return optimizedRoute;
+  }
+  
+  // Enhanced nearest neighbor algorithm with full consideration of distances
   let currentPoint = start;
+  const unvisited = [...remainingCustomers];
   
-  // First, add completed customers in the order they were completed
-  const completedCustomers = remaining.filter(c => c.status === 'completed');
-  
-  // Then, handle current customer if exists
-  const currentCustomerIndex = remaining.findIndex(c => c.status === 'current');
-  
-  // For pending/current customers, apply the nearest neighbor algorithm
-  const pendingAndCurrent = remaining.filter(c => c.status !== 'completed');
-  
-  // If there are no pending or current customers, return completed ones
-  if (pendingAndCurrent.length === 0) {
-    return completedCustomers;
+  while (unvisited.length > 0) {
+    // Find nearest unvisited customer from current point
+    let nearestIndex = -1;
+    let minDistance = Infinity;
+    
+    // Special case: If there's a current customer and it's the first iteration,
+    // prioritize it regardless of distance
+    if (currentCustomer && unvisited.includes(currentCustomer)) {
+      nearestIndex = unvisited.findIndex(c => c.id === currentCustomer.id);
+    } else {
+      // Otherwise find the genuinely closest location
+      for (let i = 0; i < unvisited.length; i++) {
+        const distance = calculateDistance(
+          currentPoint.lat,
+          currentPoint.lng,
+          unvisited[i].location.lat,
+          unvisited[i].location.lng
+        );
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestIndex = i;
+        }
+      }
+    }
+    
+    // Add nearest customer to optimized route
+    if (nearestIndex !== -1) {
+      const nearestCustomer = unvisited.splice(nearestIndex, 1)[0];
+      optimizedRoute.push(nearestCustomer);
+      
+      // Update current point for next iteration
+      currentPoint = { 
+        lat: nearestCustomer.location.lat, 
+        lng: nearestCustomer.location.lng 
+      };
+    }
   }
   
-  // If there's a current customer, it should be the first destination
-  if (currentCustomerIndex !== -1) {
-    const currentCustomer = remaining[currentCustomerIndex];
-    pendingAndCurrent.splice(pendingAndCurrent.findIndex(c => c.id === currentCustomer.id), 1);
-    optimizedRoute.push(currentCustomer);
-    currentPoint = { lat: currentCustomer.location.lat, lng: currentCustomer.location.lng };
-  }
-  
-  // Apply nearest neighbor for remaining pending customers
-  while (pendingAndCurrent.length > 0) {
-    // Find nearest customer to current point
-    const nearestIndex = findNearestCustomerIndex(currentPoint, pendingAndCurrent);
-    const nearestCustomer = pendingAndCurrent.splice(nearestIndex, 1)[0];
-    optimizedRoute.push(nearestCustomer);
-    currentPoint = { lat: nearestCustomer.location.lat, lng: nearestCustomer.location.lng };
-  }
-  
-  // Combine completed customers and optimized route
-  return [...completedCustomers, ...optimizedRoute];
+  // Return optimized route
+  return optimizedRoute;
 };
 
 // Helper function to find the nearest customer from current point
