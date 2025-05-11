@@ -62,10 +62,24 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
   });
 
   // Create polyline coordinates for the route
-  const polylinePositions = customers.map(customer => [
-    customer.location.lat,
-    customer.location.lng
-  ]);
+  const polylinePositions: [number, number][] = [];
+  
+  // Add current location as first point if available
+  if (currentLocation) {
+    polylinePositions.push(currentLocation);
+  }
+  
+  // Add customer locations in order (starting with current customer)
+  const currentCustomer = customers.find(c => c.status === 'current');
+  if (currentCustomer) {
+    polylinePositions.push([currentCustomer.location.lat, currentCustomer.location.lng]);
+  }
+  
+  // Add remaining pending customers
+  const pendingCustomers = customers
+    .filter(c => c.status === 'pending')
+    .map(customer => [customer.location.lat, customer.location.lng] as [number, number]);
+  polylinePositions.push(...pendingCustomers);
 
   // Calculate center position
   const mapCenter = currentLocation || 
@@ -114,7 +128,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         {customers.map((customer) => (
           <Marker 
             key={customer.id} 
-            position={[customer.location.lat, customer.location.lng]}
+            position={[customer.location.lat, customer.location.lng] as [number, number]}
             icon={
               customer.status === 'completed' 
                 ? completedIcon 
@@ -137,7 +151,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         ))}
         
         {/* Route polyline */}
-        {customers.length > 0 && (
+        {polylinePositions.length > 1 && (
           <Polyline 
             positions={polylinePositions}
             pathOptions={{ color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }}

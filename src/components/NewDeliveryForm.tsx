@@ -1,9 +1,10 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Customer } from '@/types/customer';
+import { useToast } from '@/components/ui/use-toast';
 
 interface NewDeliveryFormProps {
   onAddDelivery: (customer: Omit<Customer, 'id' | 'status'>) => void;
@@ -18,9 +19,20 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
     lat: 12.9716, // Default Bangalore latitude
     lng: 77.5946  // Default Bangalore longitude
   });
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isGeocoding) {
+      toast({
+        title: "Still finding location",
+        description: "Please wait while we determine the exact location",
+        variant: "warning"
+      });
+      return;
+    }
     
     onAddDelivery({
       name,
@@ -36,22 +48,76 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
     setLocation({ lat: 12.9716, lng: 77.5946 });
   };
 
-  // Geocode the address to get coordinates (simplified version)
-  // In a real app, this would use a geocoding API like Google Maps
-  const handleAddressChange = (addressValue: string) => {
-    setAddress(addressValue);
-    
-    // This is a simulation of geocoding - in a real app, 
-    // you would call a geocoding API here
-    // For now, we'll just randomly adjust coordinates near Bangalore
-    if (addressValue.length > 5) {
-      // Generate a location somewhere in Bangalore area
+  useEffect(() => {
+    // Debounce the geocoding request
+    const timer = setTimeout(() => {
+      if (address.length > 5) {
+        geocodeAddress(address);
+      }
+    }, 800); // Wait 800ms after last keypress
+
+    return () => clearTimeout(timer);
+  }, [address]);
+
+  // Geocode the address to get coordinates
+  const geocodeAddress = async (addressValue: string) => {
+    if (!addressValue || addressValue.length < 5) return;
+
+    setIsGeocoding(true);
+    try {
+      // Add "Bangalore" to the address if it's not already included
+      const fullAddress = addressValue.toLowerCase().includes('bangalore') 
+        ? addressValue 
+        : `${addressValue}, Bangalore, India`;
+
+      // Use the OpenStreetMap Nominatim API for geocoding
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddress)}&format=json&limit=1`);
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        setLocation({
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon)
+        });
+        
+        toast({
+          title: "Location found",
+          description: "Address has been located on the map",
+        });
+      } else {
+        // If API couldn't find the location, generate a location near Bangalore
+        const randomOffset = () => (Math.random() - 0.5) * 0.05;
+        setLocation({
+          lat: 12.9716 + randomOffset(),
+          lng: 77.5946 + randomOffset()
+        });
+        
+        toast({
+          title: "Using approximate location",
+          description: "Couldn't find exact coordinates, using an approximate location in Bangalore",
+        });
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      // Fallback to random location
       const randomOffset = () => (Math.random() - 0.5) * 0.05;
       setLocation({
         lat: 12.9716 + randomOffset(),
         lng: 77.5946 + randomOffset()
       });
+      
+      toast({
+        title: "Geocoding error",
+        description: "Using approximate location in Bangalore area",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeocoding(false);
     }
+  };
+
+  const handleAddressChange = (addressValue: string) => {
+    setAddress(addressValue);
   };
 
   return (
@@ -76,6 +142,9 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
           placeholder="121, MG Road, Bangalore, 560001"
           required
         />
+        {isGeocoding && (
+          <p className="text-xs text-muted-foreground mt-1">Finding location...</p>
+        )}
       </div>
       
       <div className="space-y-2">
@@ -116,8 +185,12 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
       </div>
       
       <div className="pt-2">
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? 'Adding...' : 'Add Delivery'}
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={isLoading || isGeocoding}
+        >
+          {isLoading ? 'Adding...' : isGeocoding ? 'Finding Location...' : 'Add Delivery'}
         </Button>
       </div>
     </form>
