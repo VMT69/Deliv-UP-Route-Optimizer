@@ -1,18 +1,64 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Customer } from '@/types/customer';
 import { getMockCustomers, optimizeRoute } from '@/services/api';
 import DeliveryMap from '@/components/DeliveryMap';
 import CustomerList from '@/components/CustomerList';
-import { MapPin } from 'lucide-react';
+import { MapPin, Plus } from 'lucide-react';
+import NewDeliveryForm from '@/components/NewDeliveryForm';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const Delivery = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [journeyStarted, setJourneyStarted] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<[number, number] | undefined>(undefined);
+  const [isWatchingLocation, setIsWatchingLocation] = useState(false);
+  const [locationWatchId, setLocationWatchId] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Watch current location when journey starts
+  useEffect(() => {
+    if (journeyStarted && !isWatchingLocation) {
+      // Initial location fetch
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation([position.coords.latitude, position.coords.longitude]);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          toast({
+            title: "Location Error",
+            description: "Couldn't access your location. Using default Bangalore center.",
+            variant: "destructive",
+          });
+          setCurrentLocation([12.9716, 77.5946]); // Default to Bangalore
+        }
+      );
+
+      // Start watching location
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          setCurrentLocation([position.coords.latitude, position.coords.longitude]);
+        },
+        (error) => {
+          console.error('Error watching location:', error);
+        }
+      );
+
+      setLocationWatchId(watchId);
+      setIsWatchingLocation(true);
+    }
+
+    // Cleanup
+    return () => {
+      if (locationWatchId !== null) {
+        navigator.geolocation.clearWatch(locationWatchId);
+      }
+    };
+  }, [journeyStarted, isWatchingLocation, toast]);
 
   const startJourney = async () => {
     try {
@@ -34,7 +80,7 @@ const Delivery = () => {
       
       toast({
         title: "Journey Started",
-        description: `Optimized route for ${optimizedCustomers.length} deliveries`,
+        description: `Optimized route for ${optimizedCustomers.length} deliveries in Bangalore`,
       });
     } catch (error) {
       console.error('Failed to start journey:', error);
@@ -78,17 +124,80 @@ const Delivery = () => {
     });
   };
 
+  const handleAddNewDelivery = async (newCustomer: Omit<Customer, 'id' | 'status'>) => {
+    try {
+      setIsLoading(true);
+
+      // Create new customer object with id and status
+      const newCustomerId = `${customers.length + 1}-${Date.now()}`;
+      const customerToAdd: Customer = {
+        id: newCustomerId,
+        ...newCustomer,
+        status: 'pending'
+      };
+
+      // Optimize route with the new customer
+      let updatedCustomers: Customer[];
+
+      if (customers.length === 0) {
+        // If no existing customers, just add the new one as current
+        updatedCustomers = [{ ...customerToAdd, status: 'current' }];
+      } else {
+        // Create an array with existing customers and the new one
+        const combinedCustomers = [...customers, customerToAdd];
+        
+        // Re-optimize the route
+        const optimized = await optimizeRoute(combinedCustomers);
+        
+        // Preserve the status of existing customers
+        updatedCustomers = optimized.map(c => {
+          if (c.id === newCustomerId) return c; // New customer
+          
+          const existingCustomer = customers.find(ec => ec.id === c.id);
+          if (existingCustomer) return { ...c, status: existingCustomer.status };
+          
+          return c;
+        });
+      }
+
+      setCustomers(updatedCustomers);
+      
+      toast({
+        title: "Delivery Added",
+        description: `New delivery to ${newCustomer.name} has been added to your route`,
+      });
+
+    } catch (error) {
+      console.error('Failed to add new delivery:', error);
+      toast({
+        title: "Error Adding Delivery", 
+        description: "Failed to add new delivery to the route. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const resetJourney = () => {
+    // Clear location watch
+    if (locationWatchId !== null) {
+      navigator.geolocation.clearWatch(locationWatchId);
+      setLocationWatchId(null);
+      setIsWatchingLocation(false);
+    }
+    
     setCustomers([]);
     setJourneyStarted(false);
+    setCurrentLocation(undefined);
   };
 
   return (
     <div className="container max-w-3xl mx-auto py-8 px-4 sm:px-6">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">Delivery Route Optimizer</h1>
+        <h1 className="text-3xl font-bold mb-2">DeliUp</h1>
         <p className="text-muted-foreground">
-          Efficiently manage deliveries with optimized routes
+          Efficiently manage deliveries across Bangalore
         </p>
       </div>
       
@@ -98,7 +207,7 @@ const Delivery = () => {
             <MapPin className="mx-auto h-12 w-12 text-primary mb-4" />
             <h2 className="text-xl font-semibold mb-2">Ready for Deliveries?</h2>
             <p className="text-muted-foreground mb-6">
-              Start your journey to optimize the delivery route for today's customers.
+              Start your journey to optimize delivery routes across Bangalore.
             </p>
             <Button 
               onClick={startJourney} 
@@ -114,19 +223,39 @@ const Delivery = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Delivery Map</h2>
-            <Button variant="outline" onClick={resetJourney}>
-              Reset Journey
-            </Button>
+            <div className="flex gap-2">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add New Delivery
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Delivery</DialogTitle>
+                    <DialogDescription>
+                      Enter the customer details for the new delivery.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <NewDeliveryForm onAddDelivery={handleAddNewDelivery} isLoading={isLoading} />
+                </DialogContent>
+              </Dialog>
+              
+              <Button variant="outline" onClick={resetJourney}>
+                Reset Journey
+              </Button>
+            </div>
           </div>
           
-          <DeliveryMap customers={customers} />
+          <DeliveryMap customers={customers} currentLocation={currentLocation} />
           
           <CustomerList 
             customers={customers} 
             onDeliveryComplete={handleDeliveryComplete} 
           />
           
-          {customers.every(c => c.status === 'completed') && (
+          {customers.every(c => c.status === 'completed') && customers.length > 0 && (
             <div className="bg-green-100 p-4 rounded-lg border border-green-200 text-center">
               <h3 className="font-semibold text-green-800 mb-2">
                 All Deliveries Completed!

@@ -12,8 +12,24 @@ export const optimizeRoute = async (customers: Customer[]): Promise<Customer[]> 
   // Simulate API call with a delay
   await new Promise(resolve => setTimeout(resolve, 1000));
   
-  // Starting point (could be current location or depot)
-  const start = { lat: 40.7128, lng: -74.0060 }; // New York City as default starting point
+  // Current location (from geolocation) or default Bangalore location
+  let start = { lat: 12.9716, lng: 77.5946 }; // Bangalore center as default
+  
+  // If we can access navigator, try to get current location
+  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => 
+        navigator.geolocation.getCurrentPosition(resolve, reject)
+      );
+      
+      start = { 
+        lat: position.coords.latitude, 
+        lng: position.coords.longitude 
+      };
+    } catch (error) {
+      console.error("Couldn't get current location, using default:", error);
+    }
+  }
   
   // Clone the customers array to avoid mutating the original
   const remaining = [...customers];
@@ -79,47 +95,47 @@ const deg2rad = (deg: number): number => {
   return deg * (Math.PI / 180);
 };
 
-// Mock customer data
+// Mock customer data - Bangalore locations
 export const getMockCustomers = (): Customer[] => {
   return [
     {
       id: '1',
-      name: 'John Smith',
-      address: '123 Main St, New York, NY 10001',
-      phone: '(212) 555-1234',
-      location: { lat: 40.7128, lng: -74.0060 },
+      name: 'Rahul Sharma',
+      address: '42, Richmond Road, Bangalore, 560025',
+      phone: '+91 98765 43210',
+      location: { lat: 12.9647, lng: 77.6082 },
       status: 'pending'
     },
     {
       id: '2',
-      name: 'Jane Doe',
-      address: '456 Park Ave, New York, NY 10022',
-      phone: '(212) 555-5678',
-      location: { lat: 40.7580, lng: -73.9855 },
+      name: 'Priya Patel',
+      address: '121, MG Road, Bangalore, 560001',
+      phone: '+91 87654 32109',
+      location: { lat: 12.9758, lng: 77.6065 },
       status: 'pending'
     },
     {
       id: '3',
-      name: 'Robert Johnson',
-      address: '789 Broadway, New York, NY 10003',
-      phone: '(212) 555-9012',
-      location: { lat: 40.7264, lng: -73.9878 },
+      name: 'Vikram Malhotra',
+      address: '78, Indiranagar 100ft Road, Bangalore, 560038',
+      phone: '+91 76543 21098',
+      location: { lat: 12.9784, lng: 77.6408 },
       status: 'pending'
     },
     {
       id: '4',
-      name: 'Sarah Williams',
-      address: '101 5th Ave, New York, NY 10010',
-      phone: '(212) 555-3456',
-      location: { lat: 40.7410, lng: -73.9896 },
+      name: 'Ananya Desai',
+      address: '22, Koramangala 5th Block, Bangalore, 560095',
+      phone: '+91 65432 10987',
+      location: { lat: 12.9340, lng: 77.6155 },
       status: 'pending'
     },
     {
       id: '5',
-      name: 'Michael Brown',
-      address: '202 W 21st St, New York, NY 10011',
-      phone: '(212) 555-7890',
-      location: { lat: 40.7430, lng: -74.0018 },
+      name: 'Karthik Iyer',
+      address: '155, HSR Layout, Bangalore, 560102',
+      phone: '+91 54321 09876',
+      location: { lat: 12.9116, lng: 77.6416 },
       status: 'pending'
     }
   ];

@@ -1,35 +1,64 @@
 
 import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import { Icon } from 'leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import { Customer } from '@/types/customer';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// This component updates the map center when coordinates change
+function ChangeMapView({ coords }: { coords: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(coords, map.getZoom());
+  }, [coords, map]);
+  
+  return null;
+}
 
 interface DeliveryMapProps {
   customers: Customer[];
+  currentLocation?: [number, number];
 }
 
-const DeliveryMap = ({ customers }: DeliveryMapProps) => {
+const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
+  // Bangalore coordinates
+  const bangaloreCoords: [number, number] = [12.9716, 77.5946];
+  
   // Create custom icons
-  const completedIcon = new Icon({
+  const completedIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    shadowSize: [41, 41],
   });
 
-  const pendingIcon = new Icon({
+  const pendingIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    shadowSize: [41, 41],
   });
 
-  const currentIcon = new Icon({
+  const currentIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    shadowSize: [41, 41],
+  });
+
+  const currentLocationIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    shadowSize: [41, 41],
   });
 
   // Create polyline coordinates for the route
@@ -38,22 +67,26 @@ const DeliveryMap = ({ customers }: DeliveryMapProps) => {
     customer.location.lng
   ]);
 
+  // Calculate center position
+  const mapCenter = currentLocation || 
+                   (customers.length > 0 ? calculateCenterPosition() : bangaloreCoords);
+
   // Calculate center position based on average of all customer coordinates
-  const calculateCenterPosition = () => {
-    if (customers.length === 0) return [40.7128, -74.0060]; // Default to NYC
+  function calculateCenterPosition(): [number, number] {
+    if (customers.length === 0) return bangaloreCoords;
 
     const sumLat = customers.reduce((sum, customer) => sum + customer.location.lat, 0);
     const sumLng = customers.reduce((sum, customer) => sum + customer.location.lng, 0);
     
     return [sumLat / customers.length, sumLng / customers.length];
-  };
+  }
 
   return (
     <div className="h-[400px] rounded-lg overflow-hidden shadow-md">
       <MapContainer 
-        center={calculateCenterPosition() as [number, number]} 
-        zoom={13} 
-        scrollWheelZoom={false}
+        center={bangaloreCoords}
+        zoom={12} 
+        scrollWheelZoom={true}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
@@ -61,6 +94,23 @@ const DeliveryMap = ({ customers }: DeliveryMapProps) => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
+        <ChangeMapView coords={mapCenter} />
+        
+        {/* Current location marker */}
+        {currentLocation && (
+          <Marker 
+            position={currentLocation}
+            icon={currentLocationIcon}
+          >
+            <Popup>
+              <div className="text-sm">
+                <p className="font-bold">Your Current Location</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+        
+        {/* Customer markers */}
         {customers.map((customer) => (
           <Marker 
             key={customer.id} 
@@ -86,13 +136,13 @@ const DeliveryMap = ({ customers }: DeliveryMapProps) => {
           </Marker>
         ))}
         
-        <Polyline 
-          positions={polylinePositions as [number, number][]} 
-          color="#3B82F6" 
-          weight={4} 
-          opacity={0.7} 
-          dashArray="10, 10"
-        />
+        {/* Route polyline */}
+        {customers.length > 0 && (
+          <Polyline 
+            positions={polylinePositions}
+            pathOptions={{ color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }}
+          />
+        )}
       </MapContainer>
     </div>
   );
