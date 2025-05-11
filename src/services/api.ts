@@ -4,48 +4,80 @@ import { Customer } from '@/types/customer';
 
 // Mock API service for route optimization
 // In a real application, this would call your Express backend
-export const optimizeRoute = async (customers: Customer[]): Promise<Customer[]> => {
+export const optimizeRoute = async (customers: Customer[], currentLocation?: { lat: number, lng: number }): Promise<Customer[]> => {
   // For this demo, we'll implement a simple nearest neighbor algorithm directly in the frontend
   // In production, this would be a call to your backend API
   console.log('Optimizing route for customers:', customers);
   
+  // If no customers, return empty array
+  if (customers.length === 0) return [];
+  
   // Simulate API call with a delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Current location (from geolocation) or default Bangalore location
-  let start = { lat: 12.9716, lng: 77.5946 }; // Bangalore center as default
+  // Use provided current location or default Bangalore location
+  let start = currentLocation || { lat: 12.9716, lng: 77.5946 };
   
-  // If we can access navigator, try to get current location
-  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+  // If we don't have current location explicitly passed, try to get it
+  if (!currentLocation && typeof navigator !== 'undefined' && navigator.geolocation) {
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => 
-        navigator.geolocation.getCurrentPosition(resolve, reject)
+        navigator.geolocation.getCurrentPosition(resolve, reject, { 
+          enableHighAccuracy: true, 
+          timeout: 5000, 
+          maximumAge: 0 
+        })
       );
       
       start = { 
         lat: position.coords.latitude, 
         lng: position.coords.longitude 
       };
+      console.log('Using current position for optimization:', start);
     } catch (error) {
       console.error("Couldn't get current location, using default:", error);
     }
   }
   
   // Clone the customers array to avoid mutating the original
-  const remaining = [...customers];
+  // Preserve the status of existing customers
+  const remaining = customers.map(customer => ({...customer}));
   const optimizedRoute: Customer[] = [];
   let currentPoint = start;
   
-  // Simple nearest neighbor algorithm
-  while (remaining.length > 0) {
+  // First, add completed customers in the order they were completed
+  const completedCustomers = remaining.filter(c => c.status === 'completed');
+  
+  // Then, handle current customer if exists
+  const currentCustomerIndex = remaining.findIndex(c => c.status === 'current');
+  
+  // For pending/current customers, apply the nearest neighbor algorithm
+  const pendingAndCurrent = remaining.filter(c => c.status !== 'completed');
+  
+  // If there are no pending or current customers, return completed ones
+  if (pendingAndCurrent.length === 0) {
+    return completedCustomers;
+  }
+  
+  // If there's a current customer, it should be the first destination
+  if (currentCustomerIndex !== -1) {
+    const currentCustomer = remaining[currentCustomerIndex];
+    pendingAndCurrent.splice(pendingAndCurrent.findIndex(c => c.id === currentCustomer.id), 1);
+    optimizedRoute.push(currentCustomer);
+    currentPoint = { lat: currentCustomer.location.lat, lng: currentCustomer.location.lng };
+  }
+  
+  // Apply nearest neighbor for remaining pending customers
+  while (pendingAndCurrent.length > 0) {
     // Find nearest customer to current point
-    const nearestIndex = findNearestCustomerIndex(currentPoint, remaining);
-    const nearestCustomer = remaining.splice(nearestIndex, 1)[0];
+    const nearestIndex = findNearestCustomerIndex(currentPoint, pendingAndCurrent);
+    const nearestCustomer = pendingAndCurrent.splice(nearestIndex, 1)[0];
     optimizedRoute.push(nearestCustomer);
     currentPoint = { lat: nearestCustomer.location.lat, lng: nearestCustomer.location.lng };
   }
   
-  return optimizedRoute;
+  // Combine completed customers and optimized route
+  return [...completedCustomers, ...optimizedRoute];
 };
 
 // Helper function to find the nearest customer from current point

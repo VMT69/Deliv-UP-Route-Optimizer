@@ -1,14 +1,15 @@
 
 import { Button } from '@/components/ui/button';
 import { Customer } from '@/types/customer';
-import { Check } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 
 interface CustomerListProps {
   customers: Customer[];
   onDeliveryComplete: (customerId: string) => void;
+  onDeleteDelivery?: (customerId: string) => void;
 }
 
-const CustomerList = ({ customers, onDeliveryComplete }: CustomerListProps) => {
+const CustomerList = ({ customers, onDeliveryComplete, onDeleteDelivery }: CustomerListProps) => {
   return (
     <div className="space-y-4 mt-4">
       <h2 className="text-xl font-bold">Delivery Route</h2>
@@ -49,16 +50,29 @@ const CustomerList = ({ customers, onDeliveryComplete }: CustomerListProps) => {
                   <p className="text-sm text-muted-foreground">{customer.phone}</p>
                 </div>
                 
-                <Button
-                  variant={customer.status === 'completed' ? "outline" : "default"}
-                  size="sm"
-                  disabled={customer.status === 'completed' || 
-                            (customer.status === 'pending' && 
-                             customers.some(c => c.status === 'current'))}
-                  onClick={() => onDeliveryComplete(customer.id)}
-                >
-                  {customer.status === 'completed' ? 'Delivered' : 'Mark Delivered'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant={customer.status === 'completed' ? "outline" : "default"}
+                    size="sm"
+                    disabled={customer.status === 'completed' || 
+                              (customer.status === 'pending' && 
+                               customers.some(c => c.status === 'current'))}
+                    onClick={() => onDeliveryComplete(customer.id)}
+                  >
+                    {customer.status === 'completed' ? 'Delivered' : 'Mark Delivered'}
+                  </Button>
+                  
+                  {onDeleteDelivery && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => onDeleteDelivery(customer.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ))}

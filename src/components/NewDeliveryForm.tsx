@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +28,7 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
       toast({
         title: "Still finding location",
         description: "Please wait while we determine the exact location",
-        variant: "warning"
+        variant: "destructive"
       });
       return;
     }
@@ -48,6 +47,10 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
     setLocation({ lat: 12.9716, lng: 77.5946 });
   };
 
+  const handleAddressChange = (addressValue: string) => {
+    setAddress(addressValue);
+  };
+
   useEffect(() => {
     // Debounce the geocoding request
     const timer = setTimeout(() => {
@@ -60,7 +63,7 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
   }, [address]);
 
   // Geocode the address to get coordinates
-  const geocodeAddress = async (addressValue: string) => {
+  async function geocodeAddress(addressValue: string) {
     if (!addressValue || addressValue.length < 5) return;
 
     setIsGeocoding(true);
@@ -114,10 +117,6 @@ const NewDeliveryForm = ({ onAddDelivery, isLoading }: NewDeliveryFormProps) => 
     } finally {
       setIsGeocoding(false);
     }
-  };
-
-  const handleAddressChange = (addressValue: string) => {
-    setAddress(addressValue);
   };
 
   return (

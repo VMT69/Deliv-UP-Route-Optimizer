@@ -67,8 +67,14 @@ const Delivery = () => {
       // Get mock customers
       const mockCustomers = getMockCustomers();
       
+      // Get current location for optimization
+      let userLocation: { lat: number, lng: number } | undefined;
+      if (currentLocation) {
+        userLocation = { lat: currentLocation[0], lng: currentLocation[1] };
+      }
+      
       // Optimize the route
-      const optimizedCustomers = await optimizeRoute(mockCustomers);
+      const optimizedCustomers = await optimizeRoute(mockCustomers, userLocation);
       
       // Set the first customer as current
       if (optimizedCustomers.length > 0) {
@@ -136,29 +142,27 @@ const Delivery = () => {
         status: 'pending'
       };
 
-      // Optimize route with the new customer
-      let updatedCustomers: Customer[];
-
-      if (customers.length === 0) {
-        // If no existing customers, just add the new one as current
-        updatedCustomers = [{ ...customerToAdd, status: 'current' }];
-      } else {
-        // Create an array with existing customers and the new one
-        const combinedCustomers = [...customers, customerToAdd];
-        
-        // Re-optimize the route
-        const optimized = await optimizeRoute(combinedCustomers);
-        
-        // Preserve the status of existing customers
-        updatedCustomers = optimized.map(c => {
-          if (c.id === newCustomerId) return c; // New customer
-          
-          const existingCustomer = customers.find(ec => ec.id === c.id);
-          if (existingCustomer) return { ...c, status: existingCustomer.status };
-          
-          return c;
-        });
+      // Get current location for optimization
+      let userLocation: { lat: number, lng: number } | undefined;
+      if (currentLocation) {
+        userLocation = { lat: currentLocation[0], lng: currentLocation[1] };
       }
+
+      // Create an array with existing customers and the new one
+      const combinedCustomers = [...customers, customerToAdd];
+      
+      // Re-optimize the route
+      const optimized = await optimizeRoute(combinedCustomers, userLocation);
+      
+      // Preserve the status of existing customers
+      const updatedCustomers = optimized.map(c => {
+        if (c.id === newCustomerId) return c; // New customer
+        
+        const existingCustomer = customers.find(ec => ec.id === c.id);
+        if (existingCustomer) return { ...c, status: existingCustomer.status };
+        
+        return c;
+      });
 
       setCustomers(updatedCustomers);
       
@@ -172,6 +176,58 @@ const Delivery = () => {
       toast({
         title: "Error Adding Delivery", 
         description: "Failed to add new delivery to the route. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteDelivery = async (customerId: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Get the customer being deleted for toast message
+      const customerToDelete = customers.find(c => c.id === customerId);
+      
+      // Remove the customer from the array
+      const remainingCustomers = customers.filter(c => c.id !== customerId);
+      
+      // If we're deleting the current customer, need to find a new current
+      const wasCurrentDeleted = customerToDelete?.status === 'current';
+      
+      // Get current location for optimization
+      let userLocation: { lat: number, lng: number } | undefined;
+      if (currentLocation) {
+        userLocation = { lat: currentLocation[0], lng: currentLocation[1] };
+      }
+      
+      // Re-optimize the remaining customers with current location
+      let optimizedCustomers = await optimizeRoute(remainingCustomers, userLocation);
+      
+      // If the deleted customer was the current one and we have pending customers, 
+      // set the first pending as current
+      if (wasCurrentDeleted && optimizedCustomers.some(c => c.status === 'pending')) {
+        const firstPendingIndex = optimizedCustomers.findIndex(c => c.status === 'pending');
+        if (firstPendingIndex !== -1) {
+          optimizedCustomers[firstPendingIndex].status = 'current';
+        }
+      }
+      
+      setCustomers(optimizedCustomers);
+      
+      toast({
+        title: "Delivery Removed",
+        description: customerToDelete 
+          ? `Delivery to ${customerToDelete.name} has been removed`
+          : "Delivery has been removed",
+      });
+      
+    } catch (error) {
+      console.error('Failed to delete delivery:', error);
+      toast({
+        title: "Error Removing Delivery",
+        description: "Failed to remove delivery from the route. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -252,7 +308,8 @@ const Delivery = () => {
           
           <CustomerList 
             customers={customers} 
-            onDeliveryComplete={handleDeliveryComplete} 
+            onDeliveryComplete={handleDeliveryComplete}
+            onDeleteDelivery={handleDeleteDelivery}
           />
           
           {customers.every(c => c.status === 'completed') && customers.length > 0 && (
