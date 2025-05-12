@@ -38,7 +38,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
   const bangaloreCoords: [number, number] = [12.9716, 77.5946];
   
   // Create custom icons
-  const completedIcon = new L.Icon({
+  const completedIcon = L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -47,7 +47,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     shadowSize: [41, 41],
   });
 
-  const pendingIcon = new L.Icon({
+  const pendingIcon = L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -56,7 +56,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     shadowSize: [41, 41],
   });
 
-  const currentIcon = new L.Icon({
+  const currentIcon = L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -65,7 +65,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     shadowSize: [41, 41],
   });
 
-  const currentLocationIcon = new L.Icon({
+  const currentLocationIcon = L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -127,6 +127,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         {currentLocation && (
           <Marker 
             position={currentLocation}
+            icon={currentLocationIcon}
           >
             <Popup>
               <div className="text-sm">
@@ -138,17 +139,20 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         
         {/* Customer markers */}
         {customers.map((customer) => {
-          const icon = customer.status === 'completed' 
-            ? completedIcon 
-            : customer.status === 'current' 
-              ? currentIcon 
-              : pendingIcon;
+          let markerIcon;
+          if (customer.status === 'completed') {
+            markerIcon = completedIcon;
+          } else if (customer.status === 'current') {
+            markerIcon = currentIcon;
+          } else {
+            markerIcon = pendingIcon;
+          }
               
           return (
             <Marker 
               key={customer.id} 
               position={[customer.location.lat, customer.location.lng]}
-              icon={icon}
+              icon={markerIcon}
             >
               <Popup>
                 <div className="text-sm">

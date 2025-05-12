@@ -1,10 +1,39 @@
+
 import axios from 'axios';
 import { Customer } from '@/types/customer';
 
-// Enhanced route optimization using Nearest Neighbor algorithm
-// prioritizing efficient routing rather than sequence order
+// Kruskal's algorithm for finding Minimum Spanning Tree
+interface Edge {
+  start: number;
+  end: number;
+  weight: number;
+}
+
+class DisjointSet {
+  private parent: number[];
+  
+  constructor(n: number) {
+    this.parent = Array(n).fill(0).map((_, i) => i);
+  }
+  
+  find(x: number): number {
+    if (this.parent[x] !== x) {
+      this.parent[x] = this.find(this.parent[x]); // Path compression
+    }
+    return this.parent[x];
+  }
+  
+  union(x: number, y: number): void {
+    const rootX = this.find(x);
+    const rootY = this.find(y);
+    if (rootX !== rootY) {
+      this.parent[rootY] = rootX;
+    }
+  }
+}
+
 export const optimizeRoute = async (customers: Customer[], currentLocation?: { lat: number, lng: number }): Promise<Customer[]> => {
-  console.log('Optimizing route for customers:', customers);
+  console.log('Optimizing route for customers using Kruskal\'s MST algorithm:', customers);
   
   // If no customers, return empty array
   if (customers.length === 0) return [];
@@ -61,44 +90,93 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     return optimizedRoute;
   }
   
-  // Enhanced nearest neighbor algorithm
-  // Always start from the user's current location
-  let currentPoint = start;
-  const unvisited = [...remainingCustomers];
+  // Create a list of all locations including the current location
+  const locations: Array<{ lat: number, lng: number, index: number }> = [
+    { ...start, index: -1 } // Current location has index -1
+  ];
   
-  while (unvisited.length > 0) {
-    // Find nearest unvisited customer from current point
-    let nearestIndex = -1;
-    let minDistance = Infinity;
-    
-    // Find the genuinely closest location from the current point
-    for (let i = 0; i < unvisited.length; i++) {
+  // Add all remaining customer locations
+  remainingCustomers.forEach((customer, i) => {
+    locations.push({
+      lat: customer.location.lat,
+      lng: customer.location.lng,
+      index: i
+    });
+  });
+  
+  // Generate all edges between locations with their distances as weights
+  const edges: Edge[] = [];
+  
+  for (let i = 0; i < locations.length; i++) {
+    for (let j = i + 1; j < locations.length; j++) {
       const distance = calculateDistance(
-        currentPoint.lat,
-        currentPoint.lng,
-        unvisited[i].location.lat,
-        unvisited[i].location.lng
+        locations[i].lat,
+        locations[i].lng,
+        locations[j].lat,
+        locations[j].lng
       );
       
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestIndex = i;
-      }
-    }
-    
-    // Add nearest customer to optimized route
-    if (nearestIndex !== -1) {
-      const nearestCustomer = unvisited.splice(nearestIndex, 1)[0];
-      optimizedRoute.push(nearestCustomer);
-      
-      // Update current point for next iteration
-      currentPoint = { 
-        lat: nearestCustomer.location.lat, 
-        lng: nearestCustomer.location.lng 
-      };
+      edges.push({
+        start: i,
+        end: j,
+        weight: distance
+      });
     }
   }
   
+  // Sort edges by weight (distance) in ascending order
+  edges.sort((a, b) => a.weight - b.weight);
+  
+  // Apply Kruskal's algorithm to find MST
+  const n = locations.length;
+  const mst: Edge[] = [];
+  const disjointSet = new DisjointSet(n);
+  
+  for (const edge of edges) {
+    if (disjointSet.find(edge.start) !== disjointSet.find(edge.end)) {
+      mst.push(edge);
+      disjointSet.union(edge.start, edge.end);
+    }
+    
+    // Stop when we have n-1 edges (MST is complete)
+    if (mst.length === n - 1) break;
+  }
+  
+  // Convert MST to an adjacency list
+  const graph: number[][] = Array(n).fill(0).map(() => []);
+  for (const edge of mst) {
+    graph[edge.start].push(edge.end);
+    graph[edge.end].push(edge.start); // Undirected graph
+  }
+  
+  // Now perform DFS starting from the current location (index 0)
+  // to get a route that follows the MST
+  const visited = Array(n).fill(false);
+  const route: number[] = [];
+  
+  function dfs(node: number): void {
+    visited[node] = true;
+    route.push(node);
+    
+    for (const neighbor of graph[node]) {
+      if (!visited[neighbor]) {
+        dfs(neighbor);
+      }
+    }
+  }
+  
+  dfs(0); // Start DFS from current location (index 0)
+  
+  // Convert route indices back to customers
+  // Skip the first index (0) as it's the current location
+  for (let i = 1; i < route.length; i++) {
+    const customerIndex = locations[route[i]].index;
+    if (customerIndex >= 0) {
+      optimizedRoute.push(remainingCustomers[customerIndex]);
+    }
+  }
+  
+  console.log('Optimized route using Kruskal\'s MST:', optimizedRoute);
   return optimizedRoute;
 };
 
