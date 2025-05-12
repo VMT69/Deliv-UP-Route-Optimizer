@@ -51,6 +51,7 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
   optimizedRoute.push(...completedCustomers);
   
   // For path optimization we'll only work with current and pending customers
+  // Include current customer in the optimization if it exists
   const remainingCustomers = currentCustomer 
     ? [currentCustomer, ...pendingCustomers] 
     : [...pendingCustomers];
@@ -60,7 +61,8 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     return optimizedRoute;
   }
   
-  // Enhanced nearest neighbor algorithm with full consideration of distances
+  // Enhanced nearest neighbor algorithm
+  // Always start from the user's current location
   let currentPoint = start;
   const unvisited = [...remainingCustomers];
   
@@ -69,24 +71,18 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     let nearestIndex = -1;
     let minDistance = Infinity;
     
-    // Special case: If there's a current customer and it's the first iteration,
-    // prioritize it regardless of distance
-    if (currentCustomer && unvisited.includes(currentCustomer)) {
-      nearestIndex = unvisited.findIndex(c => c.id === currentCustomer.id);
-    } else {
-      // Otherwise find the genuinely closest location
-      for (let i = 0; i < unvisited.length; i++) {
-        const distance = calculateDistance(
-          currentPoint.lat,
-          currentPoint.lng,
-          unvisited[i].location.lat,
-          unvisited[i].location.lng
-        );
-        
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestIndex = i;
-        }
+    // Find the genuinely closest location from the current point
+    for (let i = 0; i < unvisited.length; i++) {
+      const distance = calculateDistance(
+        currentPoint.lat,
+        currentPoint.lng,
+        unvisited[i].location.lat,
+        unvisited[i].location.lng
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestIndex = i;
       }
     }
     
@@ -103,33 +99,7 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     }
   }
   
-  // Return optimized route
   return optimizedRoute;
-};
-
-// Helper function to find the nearest customer from current point
-const findNearestCustomerIndex = (
-  point: { lat: number, lng: number }, 
-  customers: Customer[]
-): number => {
-  let minDistance = Infinity;
-  let nearestIndex = 0;
-  
-  customers.forEach((customer, index) => {
-    const distance = calculateDistance(
-      point.lat, 
-      point.lng, 
-      customer.location.lat, 
-      customer.location.lng
-    );
-    
-    if (distance < minDistance) {
-      minDistance = distance;
-      nearestIndex = index;
-    }
-  });
-  
-  return nearestIndex;
 };
 
 // Haversine formula to calculate distance between two coordinates

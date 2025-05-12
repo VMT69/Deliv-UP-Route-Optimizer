@@ -5,6 +5,19 @@ import { Customer } from '@/types/customer';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
+// Fix default icon issues with Leaflet in React
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
+
 // This component updates the map center when coordinates change
 function ChangeMapView({ coords }: { coords: [number, number] }) {
   const map = useMap();
@@ -27,37 +40,37 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
   // Create custom icons
   const completedIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     shadowSize: [41, 41],
   });
 
   const pendingIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     shadowSize: [41, 41],
   });
 
   const currentIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     shadowSize: [41, 41],
   });
 
   const currentLocationIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     shadowSize: [41, 41],
   });
 
@@ -98,7 +111,7 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
   return (
     <div className="h-[400px] rounded-lg overflow-hidden shadow-md">
       <MapContainer 
-        center={bangaloreCoords}
+        center={mapCenter}
         zoom={12} 
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%' }}
@@ -114,7 +127,6 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         {currentLocation && (
           <Marker 
             position={currentLocation}
-            icon={currentLocationIcon}
           >
             <Popup>
               <div className="text-sm">
@@ -125,30 +137,32 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         )}
         
         {/* Customer markers */}
-        {customers.map((customer) => (
-          <Marker 
-            key={customer.id} 
-            position={[customer.location.lat, customer.location.lng] as [number, number]}
-            icon={
-              customer.status === 'completed' 
-                ? completedIcon 
-                : customer.status === 'current' 
-                  ? currentIcon 
-                  : pendingIcon
-            }
-          >
-            <Popup>
-              <div className="text-sm">
-                <p className="font-bold">{customer.name}</p>
-                <p>{customer.address}</p>
-                <p>{customer.phone}</p>
-                <p className="font-semibold mt-1">
-                  Status: {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {customers.map((customer) => {
+          const icon = customer.status === 'completed' 
+            ? completedIcon 
+            : customer.status === 'current' 
+              ? currentIcon 
+              : pendingIcon;
+              
+          return (
+            <Marker 
+              key={customer.id} 
+              position={[customer.location.lat, customer.location.lng]}
+              icon={icon}
+            >
+              <Popup>
+                <div className="text-sm">
+                  <p className="font-bold">{customer.name}</p>
+                  <p>{customer.address}</p>
+                  <p>{customer.phone}</p>
+                  <p className="font-semibold mt-1">
+                    Status: {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
         
         {/* Route polyline */}
         {polylinePositions.length > 1 && (
