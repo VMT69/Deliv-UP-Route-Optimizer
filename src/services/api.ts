@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 import { Customer } from '@/types/customer';
 
@@ -33,7 +32,7 @@ class DisjointSet {
 }
 
 export const optimizeRoute = async (customers: Customer[], currentLocation?: { lat: number, lng: number }): Promise<Customer[]> => {
-  console.log('Optimizing route for customers using Kruskal\'s MST algorithm:', customers);
+  console.log('Optimizing route for customers using enhanced closest-first algorithm:', customers);
   
   // If no customers, return empty array
   if (customers.length === 0) return [];
@@ -90,12 +89,19 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     return optimizedRoute;
   }
 
-  // Sort remaining customers by distance from start point to prioritize closest ones
+  // Enhanced algorithm: If there's a current customer, start from their location
+  // Otherwise, start from the provided location
+  let optimizationStart = start;
+  if (currentCustomer) {
+    optimizationStart = currentCustomer.location;
+  }
+
+  // Sort ALL remaining customers by distance from the optimization start point
   const customersWithDistance = remainingCustomers.map(customer => ({
     customer,
     distance: calculateDistance(
-      start.lat,
-      start.lng,
+      optimizationStart.lat,
+      optimizationStart.lng,
       customer.location.lat,
       customer.location.lng
     )
@@ -104,124 +110,63 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
   // Sort by distance - closest first
   customersWithDistance.sort((a, b) => a.distance - b.distance);
   
-  // If we only have one or two customers, just return them sorted by distance
-  if (customersWithDistance.length <= 2) {
-    optimizedRoute.push(...customersWithDistance.map(item => item.customer));
+  // Special handling for single customer or when we have a current customer
+  if (customersWithDistance.length === 1) {
+    optimizedRoute.push(customersWithDistance[0].customer);
     return optimizedRoute;
   }
+
+  // For route optimization, use a greedy nearest-neighbor approach starting from the closest customer
+  const allCustomers = customersWithDistance.map(item => item.customer);
   
-  // For more than 2 customers, use MST but ensure the closest one is first
-  const sortedCustomers = customersWithDistance.map(item => item.customer);
+  // Start with the closest customer to our starting point
+  const routeOrder: Customer[] = [];
+  const visited = new Set<string>();
   
-  // Create a list of all locations including the current location
-  const locations: Array<{ lat: number, lng: number, index: number }> = [
-    { ...start, index: -1 } // Current location has index -1
-  ];
-  
-  // Add all remaining customer locations
-  sortedCustomers.forEach((customer, i) => {
-    locations.push({
-      lat: customer.location.lat,
-      lng: customer.location.lng,
-      index: i
-    });
-  });
-  
-  // Generate all edges between locations with their distances as weights
-  const edges: Edge[] = [];
-  
-  for (let i = 0; i < locations.length; i++) {
-    for (let j = i + 1; j < locations.length; j++) {
-      const distance = calculateDistance(
-        locations[i].lat,
-        locations[i].lng,
-        locations[j].lat,
-        locations[j].lng
-      );
-      
-      edges.push({
-        start: i,
-        end: j,
-        weight: distance
-      });
-    }
+  // If we have a current customer, it should be processed first (but might not be the closest)
+  if (currentCustomer && !visited.has(currentCustomer.id)) {
+    routeOrder.push(currentCustomer);
+    visited.add(currentCustomer.id);
   }
   
-  // Sort edges by weight (distance) in ascending order
-  edges.sort((a, b) => a.weight - b.weight);
+  // Current position for the next nearest neighbor search
+  let currentPos = currentCustomer ? currentCustomer.location : optimizationStart;
   
-  // Apply Kruskal's algorithm to find MST
-  const n = locations.length;
-  const mst: Edge[] = [];
-  const disjointSet = new DisjointSet(n);
-  
-  for (const edge of edges) {
-    if (disjointSet.find(edge.start) !== disjointSet.find(edge.end)) {
-      mst.push(edge);
-      disjointSet.union(edge.start, edge.end);
-    }
-    
-    // Stop when we have n-1 edges (MST is complete)
-    if (mst.length === n - 1) break;
-  }
-  
-  // Convert MST to an adjacency list
-  const graph: number[][] = Array(n).fill(0).map(() => []);
-  for (const edge of mst) {
-    graph[edge.start].push(edge.end);
-    graph[edge.end].push(edge.start); // Undirected graph
-  }
-  
-  // Instead of DFS, use a greedy approach starting from the current location
-  // and always choosing the nearest unvisited neighbor
-  const visited = Array(n).fill(false);
-  const route: number[] = [];
-  let currentNode = 0; // Start from current location
-  
-  visited[currentNode] = true;
-  route.push(currentNode);
-  
-  // Greedily select the nearest unvisited customer
-  while (route.length < n) {
-    let nearestNode = -1;
+  // Use nearest neighbor for the remaining customers
+  while (visited.size < allCustomers.length) {
+    let nearestCustomer: Customer | null = null;
     let nearestDistance = Infinity;
     
-    // Find the nearest unvisited customer to current position
-    for (let i = 1; i < n; i++) { // Start from 1 to skip current location
-      if (!visited[i]) {
+    // Find the nearest unvisited customer
+    for (const customer of allCustomers) {
+      if (!visited.has(customer.id)) {
         const distance = calculateDistance(
-          locations[currentNode].lat,
-          locations[currentNode].lng,
-          locations[i].lat,
-          locations[i].lng
+          currentPos.lat,
+          currentPos.lng,
+          customer.location.lat,
+          customer.location.lng
         );
         
         if (distance < nearestDistance) {
           nearestDistance = distance;
-          nearestNode = i;
+          nearestCustomer = customer;
         }
       }
     }
     
-    if (nearestNode !== -1) {
-      visited[nearestNode] = true;
-      route.push(nearestNode);
-      currentNode = nearestNode;
+    if (nearestCustomer) {
+      routeOrder.push(nearestCustomer);
+      visited.add(nearestCustomer.id);
+      currentPos = nearestCustomer.location;
     } else {
       break;
     }
   }
   
-  // Convert route indices back to customers
-  // Skip the first index (0) as it's the current location
-  for (let i = 1; i < route.length; i++) {
-    const customerIndex = locations[route[i]].index;
-    if (customerIndex >= 0) {
-      optimizedRoute.push(sortedCustomers[customerIndex]);
-    }
-  }
+  // Add the optimized route to our final result
+  optimizedRoute.push(...routeOrder);
   
-  console.log('Optimized route with closest-first prioritization:', optimizedRoute);
+  console.log('Enhanced route optimization with nearest-neighbor from closest point:', optimizedRoute);
   return optimizedRoute;
 };
 
