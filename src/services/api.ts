@@ -1,7 +1,6 @@
 
 import axios from 'axios';
 import { Customer } from '@/types/customer';
-import { getRoadDistance } from './routingService';
 
 // Kruskal's algorithm for finding Minimum Spanning Tree
 interface Edge {
@@ -34,7 +33,7 @@ class DisjointSet {
 }
 
 export const optimizeRoute = async (customers: Customer[], currentLocation?: { lat: number, lng: number }): Promise<Customer[]> => {
-  console.log('Optimizing route for customers using road-based Kruskal\'s MST algorithm:', customers);
+  console.log('Optimizing route for customers using Kruskal\'s MST algorithm:', customers);
   
   // If no customers, return empty array
   if (customers.length === 0) return [];
@@ -105,41 +104,23 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     });
   });
   
-  // Generate all edges between locations with road distances as weights
+  // Generate all edges between locations with their distances as weights
   const edges: Edge[] = [];
-  
-  console.log('Calculating road-based distances between locations...');
   
   for (let i = 0; i < locations.length; i++) {
     for (let j = i + 1; j < locations.length; j++) {
-      try {
-        // Use road-based distance calculation
-        const distance = await getRoadDistance(
-          { lat: locations[i].lat, lng: locations[i].lng },
-          { lat: locations[j].lat, lng: locations[j].lng }
-        );
-        
-        edges.push({
-          start: i,
-          end: j,
-          weight: distance
-        });
-      } catch (error) {
-        console.error(`Error calculating distance between ${i} and ${j}:`, error);
-        // Fallback to Haversine distance
-        const fallbackDistance = calculateDistance(
-          locations[i].lat,
-          locations[i].lng,
-          locations[j].lat,
-          locations[j].lng
-        );
-        
-        edges.push({
-          start: i,
-          end: j,
-          weight: fallbackDistance
-        });
-      }
+      const distance = calculateDistance(
+        locations[i].lat,
+        locations[i].lng,
+        locations[j].lat,
+        locations[j].lng
+      );
+      
+      edges.push({
+        start: i,
+        end: j,
+        weight: distance
+      });
     }
   }
   
@@ -195,11 +176,11 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     }
   }
   
-  console.log('Optimized route using road-based Kruskal\'s MST:', optimizedRoute);
+  console.log('Optimized route using Kruskal\'s MST:', optimizedRoute);
   return optimizedRoute;
 };
 
-// Haversine formula to calculate distance between two coordinates (fallback)
+// Haversine formula to calculate distance between two coordinates
 const calculateDistance = (
   lat1: number, 
   lon1: number, 

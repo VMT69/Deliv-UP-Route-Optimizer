@@ -1,8 +1,7 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import { Customer } from '@/types/customer';
-import { getRoute } from '@/services/routingService';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -35,8 +34,6 @@ interface DeliveryMapProps {
 }
 
 const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
-  const [routePaths, setRoutePaths] = useState<[number, number][][]>([]);
-  
   // Bangalore coordinates
   const bangaloreCoords: [number, number] = [12.9716, 77.5946];
   
@@ -77,6 +74,30 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     shadowSize: [41, 41],
   });
 
+  // Create polyline coordinates for the route
+  const polylinePositions: [number, number][] = [];
+  
+  // Add current location as first point if available
+  if (currentLocation) {
+    polylinePositions.push(currentLocation);
+  }
+  
+  // Add customer locations in order (starting with current customer)
+  const currentCustomer = customers.find(c => c.status === 'current');
+  if (currentCustomer) {
+    polylinePositions.push([currentCustomer.location.lat, currentCustomer.location.lng]);
+  }
+  
+  // Add remaining pending customers
+  const pendingCustomers = customers
+    .filter(c => c.status === 'pending')
+    .map(customer => [customer.location.lat, customer.location.lng] as [number, number]);
+  polylinePositions.push(...pendingCustomers);
+
+  // Calculate center position
+  const mapCenter = currentLocation || 
+                   (customers.length > 0 ? calculateCenterPosition() : bangaloreCoords);
+
   // Calculate center position based on average of all customer coordinates
   function calculateCenterPosition(): [number, number] {
     if (customers.length === 0) return bangaloreCoords;
@@ -86,53 +107,6 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     
     return [sumLat / customers.length, sumLng / customers.length];
   }
-
-  // Calculate center position
-  const mapCenter = currentLocation || 
-                   (customers.length > 0 ? calculateCenterPosition() : bangaloreCoords);
-
-  // Fetch routes between consecutive customers
-  useEffect(() => {
-    const fetchRoutes = async () => {
-      if (customers.length < 2) {
-        setRoutePaths([]);
-        return;
-      }
-
-      console.log('Fetching routes for visualization...');
-      const paths: [number, number][][] = [];
-
-      // Get route from current location to first customer
-      if (currentLocation && customers.length > 0) {
-        const route = await getRoute(
-          { lat: currentLocation[0], lng: currentLocation[1] },
-          { lat: customers[0].location.lat, lng: customers[0].location.lng }
-        );
-        if (route) {
-          paths.push(route.coordinates);
-        }
-      }
-
-      // Get routes between consecutive customers
-      for (let i = 0; i < customers.length - 1; i++) {
-        const start = customers[i];
-        const end = customers[i + 1];
-        
-        const route = await getRoute(
-          { lat: start.location.lat, lng: start.location.lng },
-          { lat: end.location.lat, lng: end.location.lng }
-        );
-        
-        if (route) {
-          paths.push(route.coordinates);
-        }
-      }
-
-      setRoutePaths(paths);
-    };
-
-    fetchRoutes();
-  }, [customers, currentLocation]);
 
   return (
     <div className="h-[400px] rounded-lg overflow-hidden shadow-md">
@@ -148,20 +122,6 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
         />
         
         <ChangeMapView coords={mapCenter} />
-        
-        {/* Route paths */}
-        {routePaths.map((path, index) => (
-          <Polyline
-            key={index}
-            positions={path}
-            pathOptions={{
-              color: '#3b82f6',
-              weight: 4,
-              opacity: 0.7,
-              dashArray: '10, 5'
-            }}
-          />
-        ))}
         
         {/* Current location marker */}
         {currentLocation && (
@@ -203,10 +163,18 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
                     Status: {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
                   </p>
                 </div>
-            </Popup>
+              </Popup>
             </Marker>
           );
         })}
+        
+        {/* Route polyline */}
+        {polylinePositions.length > 1 && (
+          <Polyline 
+            positions={polylinePositions}
+            pathOptions={{ color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }}
+          />
+        )}
       </MapContainer>
     </div>
   );
