@@ -74,30 +74,6 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     shadowSize: [41, 41],
   });
 
-  // Create polyline coordinates for the route
-  const polylinePositions: [number, number][] = [];
-  
-  // Add current location as first point if available
-  if (currentLocation) {
-    polylinePositions.push(currentLocation);
-  }
-  
-  // Add customer locations in order (starting with current customer)
-  const currentCustomer = customers.find(c => c.status === 'current');
-  if (currentCustomer) {
-    polylinePositions.push([currentCustomer.location.lat, currentCustomer.location.lng]);
-  }
-  
-  // Add remaining pending customers
-  const pendingCustomers = customers
-    .filter(c => c.status === 'pending')
-    .map(customer => [customer.location.lat, customer.location.lng] as [number, number]);
-  polylinePositions.push(...pendingCustomers);
-
-  // Calculate center position
-  const mapCenter = currentLocation || 
-                   (customers.length > 0 ? calculateCenterPosition() : bangaloreCoords);
-
   // Calculate center position based on average of all customer coordinates
   function calculateCenterPosition(): [number, number] {
     if (customers.length === 0) return bangaloreCoords;
@@ -107,6 +83,10 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
     
     return [sumLat / customers.length, sumLng / customers.length];
   }
+
+  // Calculate center position
+  const mapCenter = currentLocation || 
+                   (customers.length > 0 ? calculateCenterPosition() : bangaloreCoords);
 
   return (
     <div className="h-[400px] rounded-lg overflow-hidden shadow-md">
@@ -163,18 +143,10 @@ const DeliveryMap = ({ customers, currentLocation }: DeliveryMapProps) => {
                     Status: {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
                   </p>
                 </div>
-              </Popup>
+            </Popup>
             </Marker>
           );
         })}
-        
-        {/* Route polyline */}
-        {polylinePositions.length > 1 && (
-          <Polyline 
-            positions={polylinePositions}
-            pathOptions={{ color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }}
-          />
-        )}
       </MapContainer>
     </div>
   );
