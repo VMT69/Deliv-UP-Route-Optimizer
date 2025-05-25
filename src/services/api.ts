@@ -89,6 +89,29 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
   if (remainingCustomers.length === 0) {
     return optimizedRoute;
   }
+
+  // Sort remaining customers by distance from start point to prioritize closest ones
+  const customersWithDistance = remainingCustomers.map(customer => ({
+    customer,
+    distance: calculateDistance(
+      start.lat,
+      start.lng,
+      customer.location.lat,
+      customer.location.lng
+    )
+  }));
+
+  // Sort by distance - closest first
+  customersWithDistance.sort((a, b) => a.distance - b.distance);
+  
+  // If we only have one or two customers, just return them sorted by distance
+  if (customersWithDistance.length <= 2) {
+    optimizedRoute.push(...customersWithDistance.map(item => item.customer));
+    return optimizedRoute;
+  }
+  
+  // For more than 2 customers, use MST but ensure the closest one is first
+  const sortedCustomers = customersWithDistance.map(item => item.customer);
   
   // Create a list of all locations including the current location
   const locations: Array<{ lat: number, lng: number, index: number }> = [
@@ -96,7 +119,7 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
   ];
   
   // Add all remaining customer locations
-  remainingCustomers.forEach((customer, i) => {
+  sortedCustomers.forEach((customer, i) => {
     locations.push({
       lat: customer.location.lat,
       lng: customer.location.lng,
@@ -149,34 +172,56 @@ export const optimizeRoute = async (customers: Customer[], currentLocation?: { l
     graph[edge.end].push(edge.start); // Undirected graph
   }
   
-  // Now perform DFS starting from the current location (index 0)
-  // to get a route that follows the MST
+  // Instead of DFS, use a greedy approach starting from the current location
+  // and always choosing the nearest unvisited neighbor
   const visited = Array(n).fill(false);
   const route: number[] = [];
+  let currentNode = 0; // Start from current location
   
-  function dfs(node: number): void {
-    visited[node] = true;
-    route.push(node);
+  visited[currentNode] = true;
+  route.push(currentNode);
+  
+  // Greedily select the nearest unvisited customer
+  while (route.length < n) {
+    let nearestNode = -1;
+    let nearestDistance = Infinity;
     
-    for (const neighbor of graph[node]) {
-      if (!visited[neighbor]) {
-        dfs(neighbor);
+    // Find the nearest unvisited customer to current position
+    for (let i = 1; i < n; i++) { // Start from 1 to skip current location
+      if (!visited[i]) {
+        const distance = calculateDistance(
+          locations[currentNode].lat,
+          locations[currentNode].lng,
+          locations[i].lat,
+          locations[i].lng
+        );
+        
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestNode = i;
+        }
       }
     }
+    
+    if (nearestNode !== -1) {
+      visited[nearestNode] = true;
+      route.push(nearestNode);
+      currentNode = nearestNode;
+    } else {
+      break;
+    }
   }
-  
-  dfs(0); // Start DFS from current location (index 0)
   
   // Convert route indices back to customers
   // Skip the first index (0) as it's the current location
   for (let i = 1; i < route.length; i++) {
     const customerIndex = locations[route[i]].index;
     if (customerIndex >= 0) {
-      optimizedRoute.push(remainingCustomers[customerIndex]);
+      optimizedRoute.push(sortedCustomers[customerIndex]);
     }
   }
   
-  console.log('Optimized route using Kruskal\'s MST:', optimizedRoute);
+  console.log('Optimized route with closest-first prioritization:', optimizedRoute);
   return optimizedRoute;
 };
 
