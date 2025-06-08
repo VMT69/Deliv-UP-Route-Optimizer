@@ -1,18 +1,8 @@
-# Welcome to your Lovable project
-
-## Project info
-
-**URL**: https://lovable.dev/projects/7aae7b74-fa08-4ae1-895c-2794b47bd716
+Welcome to Rakshith and Vishnu's Full Stack Development project
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/7aae7b74-fa08-4ae1-895c-2794b47bd716) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
@@ -57,17 +47,7 @@ This project is built with:
 - Vite
 - TypeScript
 - React
+- Express
+- MongoDB
 - shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/7aae7b74-fa08-4ae1-895c-2794b47bd716) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
